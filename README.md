@@ -132,6 +132,13 @@ bun test             # store + import/export tests (isolated temp data dir)
 `data/` is gitignored: it holds your canvases, the UI event log and `server.log`. The demo scripts seed
 throwaway example canvases and are safe to run against a fresh checkout.
 
+CI (`.github/workflows/ci.yml`) runs the test suite and boots the server for a smoke test on every push
+to `main` and on pull requests.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
+
 ## Layout
 
 ```
