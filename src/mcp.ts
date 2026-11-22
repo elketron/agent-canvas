@@ -35,13 +35,30 @@ function ensureServer(): Promise<void> {
   })().catch((e) => { starting = null; throw e; }));
 }
 
-async function api(method: string, path: string, payload?: unknown) {
-  await ensureServer();
-  const res = await fetch(BASE + path, {
+/** The server stopped since it was last seen up: forget that, so the next call starts it again. */
+function serverGone() {
+  starting = null;
+}
+
+async function request(method: string, path: string, payload?: unknown) {
+  return fetch(BASE + path, {
     method,
     headers: payload ? { "content-type": "application/json" } : {},
     body: payload ? JSON.stringify(payload) : undefined,
   });
+}
+
+async function api(method: string, path: string, payload?: unknown) {
+  await ensureServer();
+  let res: Response;
+  try {
+    res = await request(method, path, payload);
+  } catch {
+    // Connection refused: the server died (or was stopped) after it was started. Start it again once.
+    serverGone();
+    await ensureServer();
+    res = await request(method, path, payload);
+  }
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `${res.status} ${res.statusText}`);
   return data;
@@ -690,6 +707,8 @@ async function followEvents() {
     } catch (e: any) {
       log("event stream:", e.message);
     }
+    // The stream ended: the server may be gone, so check (and restart it) before reconnecting.
+    serverGone();
     await Bun.sleep(1000);
   }
 }
