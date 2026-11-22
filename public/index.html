@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Canvas</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0e0f'/%3E%3Crect x='7' y='7' width='8' height='8' rx='2' fill='%235a52b0'/%3E%3Crect x='17' y='7' width='8' height='8' rx='2' fill='%233a3560'/%3E%3Crect x='7' y='17' width='8' height='8' rx='2' fill='%233a3560'/%3E%3Crect x='17' y='17' width='8' height='8' rx='2' fill='%235a52b0'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="viewport">
+    <div id="dockLayer" hidden></div>
+    <div id="world"><svg id="edges"></svg></div>
+  </div>
+  <div id="dockDrop" hidden>
+    <div id="dockPreview"></div>
+    <div id="dockGhost"></div>
+  </div>
+
+  <div id="toolbar">
+    <div class="group">
+      <span class="brand">◆ Agent Canvas</span>
+      <select id="canvasSel" title="Switch canvas"></select>
+      <button id="newCanvas" title="New canvas">＋</button>
+      <button id="linkCanvas" title="Related canvases" aria-label="Related canvases">⧉</button>
+      <button id="delCanvas" title="Delete this canvas">🗑</button>
+    </div>
+    <div class="group mode-switch" role="group" aria-label="Canvas mode">
+      <button data-mode="board" title="Board mode — infinite canvas for UI mockups, notes, full frames">Board</button>
+      <button data-mode="diagram" title="Diagram mode — interactive connected nodes, spotlight & inspector">Diagram</button>
+      <button data-mode="ui" title="UI mode — non-infinite workspace with dockable boards & live apps">UI</button>
+    </div>
+    <div class="group" id="addGroup">
+      <button data-add="card" class="only-canvas" title="Add diagram card node">Card</button>
+      <button data-add="group" class="only-canvas" title="Add subgraph container">Group</button>
+      <button data-add="ui" class="only-ui" title="Add interactive UI app board">App</button>
+      <button data-add="note">Note</button>
+      <button data-add="html" class="only-canvas">HTML</button>
+      <button data-add="diagram">Mermaid</button>
+      <button id="linkMode" class="only-canvas" title="Click two nodes to connect them (L)">Link</button>
+    </div>
+    <div class="group only-ui" id="dockTools">
+      <button id="dockReset" title="Auto-tile all docked boards into a clean grid">⊞ Auto-tile</button>
+      <button id="dockRestoreAll" title="Restore all minimized boards" hidden>Restore all</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="group only-canvas" id="zoomGroup">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <button id="zoomPct" title="Reset to 100%">100%</button>
+      <button id="zoomIn" title="Zoom in">＋</button>
+      <button id="fit" title="Fit all (F)">Fit</button>
+    </div>
+    <div class="group"><span id="status" class="status off">● offline</span></div>
+  </div>
+
+  <div id="breadcrumbs" hidden></div>
+
+  <div id="flowbar" hidden>
+    <div id="flowPills" class="flow-pills"></div>
+    <div class="flow-sep"></div>
+    <div class="flow-caption" id="flowCaption"></div>
+    <div class="flow-nav" id="flowNav">
+      <button id="flowPrev" title="Previous step (←)">←</button>
+      <span id="flowCount"></span>
+      <button id="flowNext" title="Next step (→)">→</button>
+    </div>
+  </div>
+
+  <aside id="inspector" hidden>
+    <div class="ins-head">
+      <div class="ins-top">
+        <span id="insBadge" class="badge"></span>
+        <span id="insMeta" class="ins-meta"></span>
+        <span class="spacer"></span>
+        <button id="insFocus" title="Zoom to node">◎</button>
+        <button id="insEdit" title="Edit source / versions">✎</button>
+        <button id="insOpen" title="Open full page">↗</button>
+        <button id="insClose" title="Close inspector (Esc)">✕</button>
+      </div>
+      <h2 id="insTitle"></h2>
+      <p id="insSub"></p>
+    </div>
+    <div class="ins-body">
+      <div id="insLinks" class="ins-section"></div>
+      <div id="insContent" class="ins-section ins-md"></div>
+    </div>
+  </aside>
+
+  <div id="empty" hidden>
+    <h2>This canvas is empty</h2>
+    <p>Ask your agent to draw something — e.g. <em>“mock up the settings page on the canvas”</em> or
+      <em>“diagram this app’s architecture on the canvas”</em>.</p>
+    <p>Or double-click anywhere to add a note.</p>
+  </div>
+
+  <div id="hint">Drag background to pan · Ctrl/⌘ + scroll to zoom · Double-click to add a note · F to fit</div>
+
+  <div id="navdock" hidden>
+    <div class="group" id="historyGroup" hidden>
+      <button id="navBack" title="Back (Alt+←)" disabled>←</button>
+      <button id="navFwd" title="Forward (Alt+→)" disabled>→</button>
+    </div>
+    <div class="group" id="relatedGroup" hidden>
+      <span class="related-label">RELATED</span>
+      <div id="relatedPills" class="related-pills"></div>
+      <button id="editLinks" title="Edit related canvases">＋</button>
+    </div>
+  </div>
+
+  <div id="dockShelf" hidden>
+    <div class="group">
+      <span class="related-label">DOCKED</span>
+      <div id="dockShelfPills" class="dock-shelf-pills"></div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <dialog id="editor">
+    <div class="ed-head">
+      <span id="edType" class="badge"></span>
+      <input id="edTitle" placeholder="Title" />
+      <select id="edVersions" title="Version history"></select>
+    </div>
+    <div class="ed-card-fields" id="edCardFields" hidden>
+      <input id="edSub" placeholder="Subtitle (short 1-line summary)" />
+      <input id="edGroup" placeholder="Group / Layer (e.g. Server)" />
+      <input id="edMetaIn" placeholder="Meta (e.g. 163 LOC)" />
+      <input id="edSubCanvas" placeholder="Drill-down canvas id" />
+      <input id="edColor" type="color" value="#8a82cc" title="Accent color" />
+    </div>
+    <textarea id="edContent" spellcheck="false"></textarea>
+    <div class="ed-foot">
+      <span id="edMeta"></span>
+      <span class="spacer"></span>
+      <button id="edCancel">Cancel</button>
+      <button id="edSave" class="primary">Save</button>
+    </div>
+  </dialog>
+
+  <dialog id="relatedDlg" aria-label="Related canvases">
+    <div class="rd-head">
+      <span class="badge">RELATED</span>
+      <input id="rdSearch" placeholder="Search canvases…" />
+      <button id="rdClose" title="Close">✕</button>
+    </div>
+    <p class="rd-note">Links are stored with the canvas and shared with your agent. Related canvases appear in the dock at the bottom left.</p>
+    <div id="rdList" class="rd-list"></div>
+    <div class="rd-foot">
+      <span id="rdCount"></span>
+      <span class="spacer"></span>
+      <button id="rdDone" class="primary">Done</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

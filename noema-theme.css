@@ -1,0 +1,79 @@
+/*
+ * Noema theme — portable design tokens
+ * Extracted from the Noema agent workspace project.
+ *
+ * Usage in another Lovable / Tailwind v4 project:
+ *   1. Paste the :root block into your global CSS (e.g. src/styles.css).
+ *   2. Paste the @theme block below it so utilities like
+ *      bg-noema-bg, text-noema-fg, text-noema-accent work.
+ *   3. Load JetBrains Mono via a <link> in your root route head:
+ *      https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap
+ */
+
+:root {
+  /* Core surfaces (darkest → lightest) */
+  --noema-bg: #0e0e0f;        /* app background */
+  --noema-bg-deep: #0a0a0b;   /* deepest inset areas */
+  --noema-panel: #111112;     /* panel background */
+  --noema-panel-2: #131315;   /* raised panel */
+  --noema-surface: #171718;   /* cards, rows */
+  --noema-surface-2: #1a1a1c; /* hover surface */
+  --noema-border: #222224;    /* hairline borders */
+  --noema-border-2: #2a2a2c;  /* stronger borders */
+
+  /* Text */
+  --noema-fg: #c2c0b6;        /* primary text (warm gray) */
+  --noema-fg-bright: #d8d6cc; /* headings, emphasis */
+  --noema-fg-dim: #8a8880;    /* secondary text */
+  --noema-fg-faint: #6a6865;  /* placeholders, captions */
+
+  /* Accents */
+  --noema-accent: #4e46a0;        /* primary indigo */
+  --noema-accent-hi: #5e56b0;     /* accent hover */
+  --noema-accent-soft: #8a82cc;   /* accent text on dark */
+  --noema-accent-deep: #12111a;   /* accent-tinted surface */
+  --noema-accent-border: #2a2740; /* accent-tinted border */
+
+  /* Status */
+  --noema-ok: #4CAF82;
+  --noema-ok-deep: #1e3a28;
+  --noema-ok-text: #3d8a65;
+  --noema-warn: #d4a843;
+  --noema-warn-deep: #8a6e30;
+  --noema-err: #e05a5a;
+  --noema-err-deep: #3a1818;
+  --noema-err-text: #c05050;
+
+  /* Agent role colors (kanban rows) */
+  --noema-agent-planner: #7ab4e8;
+  --noema-agent-coder: #8a82cc;
+  --noema-agent-tester: #d4a843;
+  --noema-agent-reviewer: #c27ba0;
+  --noema-agent-human: #4CAF82;
+
+  /* Type */
+  --noema-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Tailwind v4 registration — enables bg-noema-bg, text-noema-accent, etc. */
+@theme inline {
+  --color-noema-bg: var(--noema-bg);
+  --color-noema-bg-deep: var(--noema-bg-deep);
+  --color-noema-panel: var(--noema-panel);
+  --color-noema-panel-2: var(--noema-panel-2);
+  --color-noema-surface: var(--noema-surface);
+  --color-noema-surface-2: var(--noema-surface-2);
+  --color-noema-border: var(--noema-border);
+  --color-noema-border-2: var(--noema-border-2);
+  --color-noema-fg: var(--noema-fg);
+  --color-noema-fg-bright: var(--noema-fg-bright);
+  --color-noema-fg-dim: var(--noema-fg-dim);
+  --color-noema-fg-faint: var(--noema-fg-faint);
+  --color-noema-accent: var(--noema-accent);
+  --color-noema-accent-hi: var(--noema-accent-hi);
+  --color-noema-accent-soft: var(--noema-accent-soft);
+  --color-noema-ok: var(--noema-ok);
+  --color-noema-warn: var(--noema-warn);
+  --color-noema-err: var(--noema-err);
+  --font-mono: var(--noema-font-mono);
+}

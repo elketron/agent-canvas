@@ -1,0 +1,20 @@
+{
+  "name": "agent-canvas",
+  "version": "0.2.0",
+  "private": true,
+  "description": "An infinite canvas that an AI agent draws on through MCP, watched and edited live in the browser.",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/server.ts",
+    "mcp": "bun src/mcp.ts",
+    "test": "bun test",
+    "demo": "bun scripts/demo-canvas-ui.ts",
+    "demo:incident": "bun scripts/demo-incident.ts"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "dependencies": {
+    "playwright-core": "^1.65.1"
+  }
+}

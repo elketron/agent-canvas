@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
+<title>Incident INC-2026-114</title>
+<style>
+  :root {
+    --bg: #0e0e0f; --bg-deep: #0a0a0b; --panel: #111112; --surface: #171718; --surface2: #1a1a1c;
+    --border: #222224; --border2: #2a2a2c;
+    --fg: #c2c0b6; --bright: #d8d6cc; --dim: #8a8880; --faint: #6a6865;
+    --accent: #8a82cc; --accent-deep: #12111a; --accent-border: #2a2740;
+    --ok: #4CAF82; --ok-deep: #16281f;
+    --warn: #d4a843; --warn-deep: #2a2113;
+    --err: #e05a5a; --err-deep: #2a1414;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 12.5px/1.45 var(--mono);
+    -webkit-font-smoothing: antialiased;
+    padding: 16px 16px 14px;
+  }
+  .app { max-width: 720px; margin: 0 auto; }
+  button { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 1px solid var(--accent); outline-offset: 1px;
+  }
+
+  /* header */
+  .hd {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--border); background: var(--panel);
+    border-radius: 10px; padding: 11px 13px 10px;
+  }
+  .hd::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--hd-accent, var(--err));
+  }
+  .hd-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .crumb {
+    display: flex; align-items: center; gap: 5px; min-width: 0;
+    font-size: 9.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .crumb b { color: var(--dim); font-weight: 500; }
+  .crumb .az { color: var(--accent); font-size: 11px; }
+  .crumb .sep { color: var(--border2); }
+  .hd-right { display: flex; align-items: center; gap: 7px; flex: none; }
+  .live {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--err);
+  }
+  .live i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--err);
+    animation: pulse 2s infinite;
+  }
+  .live.closed { color: var(--faint); }
+  .live.closed i { background: var(--faint); animation: none; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(224,90,90,.45); }
+    70% { box-shadow: 0 0 0 6px rgba(224,90,90,0); }
+    100% { box-shadow: 0 0 0 0 rgba(224,90,90,0); }
+  }
+  .icon {
+    width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
+    border: 1px solid var(--border); background: var(--surface); color: var(--faint);
+    border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1;
+  }
+  .icon:hover { color: var(--bright); background: var(--surface2); }
+  .title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 7px; }
+  .title-main { min-width: 0; }
+  h1 { margin: 0; font-size: 15px; line-height: 1.25; font-weight: 600; color: var(--bright); letter-spacing: -.01em; }
+  .meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 4px; font-size: 10px; color: var(--faint); }
+  .meta b { color: var(--dim); font-weight: 500; }
+  .dotsep { color: var(--border2); }
+  .clock { flex: none; text-align: right; padding-left: 8px; }
+  .clock-label { font-size: 8.5px; letter-spacing: .12em; color: var(--faint); }
+  .clock-val { font-size: 18px; font-weight: 600; line-height: 1.15; color: var(--bright); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+  .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 9px; }
+  .chip {
+    font-size: 9.5px; line-height: 1; padding: 3px 7px; border-radius: 999px;
+    border: 1px solid var(--border2); background: var(--surface); color: var(--dim); white-space: nowrap;
+  }
+  .chip.sev { color: var(--err); border-color: #4a2020; background: var(--err-deep); font-weight: 600; }
+  .chip.status { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+  .chip.status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .chip.st-new { color: var(--err); border-color: #4a2020; background: var(--err-deep); }
+  .chip.st-ack { color: var(--warn); border-color: #4a3a18; background: var(--warn-deep); }
+  .chip.st-mit { color: var(--accent); border-color: var(--accent-border); background: var(--accent-deep); }
+  .chip.st-res { color: var(--ok); border-color: #1e3a28; background: var(--ok-deep); }
+  .chip.ghost { color: var(--faint); }
+
+  /* kpis */
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 9px; }
+  .kpi { min-width: 0; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; padding: 8px 9px 6px; }
+  .kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .kpi-label {
+    font-size: 9px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .kpi-delta { font-size: 8.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kpi.danger .kpi-delta { color: var(--err); }
+  .kpi.warn .kpi-delta { color: var(--warn); }
+  .kpi.ok .kpi-delta { color: var(--ok); }
+  .kpi-val { margin-top: 2px; font-size: 18px; font-weight: 600; line-height: 1.15; color: var(--bright); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .kpi-val .unit { margin-left: 1px; font-size: 9.5px; font-weight: 400; color: var(--faint); letter-spacing: 0; }
+  .spark { display: block; width: 100%; height: 25px; margin-top: 3px; overflow: visible; }
+  .spark .base { stroke: var(--border2); stroke-width: 1; fill: none; }
+  .spark polyline { fill: none; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+  .spark.danger polyline { stroke: var(--err); }
+  .spark.warn polyline { stroke: var(--warn); }
+  .spark.ok polyline { stroke: var(--ok); }
+  .spark.danger circle { fill: var(--err); }
+  .spark.warn circle { fill: var(--warn); }
+  .spark.ok circle { fill: var(--ok); }
+  .kpi-base { margin-top: 1px; font-size: 8.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* blocks */
+  .block { margin-top: 9px; border: 1px solid var(--border); background: var(--panel); border-radius: 9px; overflow: hidden; }
+  .block-hd {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-bottom: 1px solid var(--border);
+    font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+  }
+  .block-hd .hint { font-size: 9px; letter-spacing: 0; text-transform: none; color: var(--faint); }
+
+  /* resources */
+  .res {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border);
+    background: none; text-align: left; cursor: pointer;
+  }
+  .res:hover { background: var(--surface2); }
+  .res:last-of-type { border-bottom: 0; }
+  .res-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--err); }
+  .res.ok .res-dot { background: var(--ok); }
+  .res.warn .res-dot { background: var(--warn); }
+  .res-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+  .res-name { font-size: 11px; color: var(--bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .res-kind { font-size: 8.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+  .res-metric { font-size: 9.5px; color: var(--dim); white-space: nowrap; }
+  .res-state { flex: none; font-size: 8.5px; line-height: 1; padding: 3px 6px; border-radius: 4px; border: 1px solid; white-space: nowrap; }
+  .res-state.err { color: var(--err); border-color: #4a2020; background: var(--err-deep); }
+  .res-state.warn { color: var(--warn); border-color: #4a3a18; background: var(--warn-deep); }
+  .res-state.ok { color: var(--ok); border-color: #1e3a28; background: var(--ok-deep); }
+  .chev { flex: none; color: var(--faint); font-size: 11px; transition: transform .12s; }
+  .res.open .chev { transform: rotate(90deg); }
+  .res-detail {
+    display: none; padding: 8px 10px 10px; border-bottom: 1px solid var(--border);
+    background: var(--bg-deep); font-size: 10px; color: var(--dim);
+  }
+  .res-detail.open { display: block; }
+  .detail-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .detail-label { font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .detail-note { margin-top: 5px; line-height: 1.45; color: var(--dim); }
+  .res-detail pre {
+    margin: 5px 0 0; padding: 7px 8px; max-height: 110px; overflow: auto;
+    border: 1px solid var(--border); border-radius: 5px; background: var(--surface);
+    font: 9.5px/1.5 var(--mono); color: var(--dim); white-space: pre-wrap;
+  }
+  .mini-btn {
+    font-size: 9px; padding: 3px 7px; border-radius: 4px;
+    border: 1px solid var(--border2); background: var(--surface); color: var(--dim);
+    cursor: pointer; white-space: nowrap;
+  }
+  .mini-btn:hover { color: var(--bright); background: var(--surface2); }
+
+  /* timeline */
+  .timeline { max-height: 168px; overflow: auto; padding: 4px 0; }
+  .tl { display: flex; gap: 8px; padding: 4px 10px; }
+  .tl-time { flex: none; width: 34px; padding-top: 1px; font-size: 9px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .tl-dot { flex: none; width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: var(--dim); }
+  .tl-body { flex: 1; min-width: 0; }
+  .tl-text { font-size: 10.5px; line-height: 1.4; color: var(--fg); }
+  .tl-src { margin-top: 1px; font-size: 8.5px; color: var(--faint); }
+  .tl:first-child { animation: slidein .16s ease; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+  .src-ai { background: var(--accent); }
+  .src-fn { background: var(--warn); }
+  .src-mon { background: var(--err); }
+  .src-dep { background: var(--accent); }
+  .src-you { background: var(--ok); }
+  .src-agent { background: var(--accent); }
+
+  /* checklist */
+  .checklist { padding: 3px 0; }
+  .check { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 10.5px; cursor: pointer; }
+  .check:hover { background: var(--surface2); }
+  .check input { flex: none; width: 12px; height: 12px; margin: 0; accent-color: var(--accent); }
+  .check .txt { flex: 1; min-width: 0; }
+  .check.done .txt { color: var(--faint); text-decoration: line-through; }
+  .check .who { flex: none; font-size: 8.5px; color: var(--ok); }
+
+  /* notes */
+  textarea {
+    display: block; width: 100%; border: 0; background: var(--surface); color: var(--fg);
+    font: 10.5px/1.5 var(--mono); padding: 8px 10px; min-height: 58px; resize: vertical; outline: none;
+  }
+  textarea::placeholder { color: var(--faint); }
+  textarea:focus { background: var(--surface2); }
+  .note-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 5px 10px; border-top: 1px solid var(--border); font-size: 8.5px; color: var(--faint);
+  }
+
+  /* actions */
+  .actions { display: flex; gap: 6px; margin-top: 9px; }
+  .primary {
+    flex: 1; min-width: 0; padding: 8px 10px; border-radius: 7px;
+    border: 1px solid var(--accent-border); background: var(--accent-deep); color: var(--accent);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+  .primary:hover { background: #171528; border-color: #3a3660; }
+  .ghost {
+    flex: none; padding: 8px 9px; border-radius: 7px;
+    border: 1px solid var(--border2); background: var(--surface); color: var(--dim);
+    font-size: 10px; cursor: pointer; white-space: nowrap;
+  }
+  .ghost:hover { color: var(--bright); background: var(--surface2); }
+  .ghost.accent { color: var(--accent); border-color: var(--accent-border); background: var(--accent-deep); }
+  .ghost.accent:hover { background: #171528; border-color: #3a3660; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 8.5px; color: var(--faint); }
+  .foot b { color: var(--dim); font-weight: 500; }
+  .foot .ok { color: var(--ok); }
+
+  /* overlay */
+  .overlay {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    align-items: center; justify-content: center; padding: 18px;
+    background: rgba(6,6,7,.72);
+  }
+  .overlay.open { display: flex; }
+  .sheet {
+    width: 100%; max-width: 560px; border: 1px solid var(--border2); border-radius: 9px;
+    background: var(--panel); overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.5);
+  }
+  .sheet-hd {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+    font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+  }
+  .sheet textarea { min-height: 220px; max-height: 46vh; background: var(--bg-deep); font-size: 9.5px; }
+  .sheet-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 520px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .actions { flex-wrap: wrap; }
+    .primary { flex-basis: 100%; }
+    .res-metric { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hd" id="hd">
+    <div class="hd-top">
+      <div class="crumb"><span class="az">◈</span> Azure Monitor <span class="sep">/</span> Incidents <span class="sep">/</span> <b>INC-2026-114</b></div>
+      <div class="hd-right">
+        <span class="live" id="live"><i></i><span id="live-label">live</span></span>
+        <button class="icon" id="reset" title="Reset demo incident" aria-label="Reset demo incident">↺</button>
+      </div>
+    </div>
+    <div class="title-row">
+      <div class="title-main">
+        <h1>Checkout latency spike — EU West</h1>
+        <div class="meta">
+          <span><b>checkout-api</b></span><span class="dotsep">·</span>
+          <span>owner <b id="owner">payments-oncall</b></span><span class="dotsep">·</span>
+          <span id="started">started 14:02 UTC</span>
+        </div>
+      </div>
+      <div class="clock">
+        <div class="clock-label" id="clock-label">ELAPSED</div>
+        <div class="clock-val" id="elapsed">00:00:00</div>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip sev">SEV-2</span>
+      <span class="chip status st-new" id="status">Investigating</span>
+      <span class="chip ghost">Application Insights</span>
+      <span class="chip ghost">Function Apps</span>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="block">
+    <div class="block-hd"><span>Affected resources</span><span class="hint">click a row for details</span></div>
+    <div id="resources"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-hd"><span>Timeline</span><span class="hint" id="tlcount"></span></div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-hd"><span>Triage</span><span class="hint" id="triage-count"></span></div>
+    <div class="checklist" id="checklist"></div>
+  </section>
+
+  <section class="block">
+    <div class="block-hd"><span>Incident notes</span><span class="hint" id="note-hint">autosaves</span></div>
+    <textarea id="note" maxlength="4000" placeholder="What do we know? What have we ruled out?"></textarea>
+    <div class="note-foot">
+      <span>Visible to the agent when you hand off or save.</span>
+      <button class="mini-btn" id="save-note">Save note</button>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="primary" id="advance">Acknowledge incident</button>
+    <button class="ghost" id="page">Page on-call</button>
+    <button class="ghost" id="copy">Copy summary</button>
+    <button class="ghost accent" id="handoff">Hand to agent</button>
+  </div>
+  <div class="foot">
+    <span>Actions update <b>canvas.state</b> and emit events the agent can read.</span>
+    <span id="foot-status">ready</span>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="sheet-hd"><span id="overlay-title">Summary</span><button class="icon" id="overlay-close" aria-label="Close">×</button></div>
+    <textarea id="overlay-text" readonly></textarea>
+    <div class="sheet-actions">
+      <button class="mini-btn" id="overlay-copy">Copy</button>
+      <button class="mini-btn" id="overlay-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const INC = "INC-2026-114";
+  const TITLE = "Checkout latency spike — EU West";
+  const SEV = "SEV-2";
+  const OWNER = "payments-oncall";
+
+  const STATUS = {
+    new:          { label: "Investigating", cls: "st-new", color: "var(--err)" },
+    acknowledged: { label: "Acknowledged",  cls: "st-ack", color: "var(--warn)" },
+    mitigated:    { label: "Mitigated",     cls: "st-mit", color: "var(--accent)" },
+    resolved:     { label: "Resolved",      cls: "st-res", color: "var(--ok)" },
+  };
+
+  const CHECK_ITEMS = [
+    { id: "blast",  text: "Confirmed blast radius (checkout-api + 3 function apps)" },
+    { id: "deploy", text: "Checked last deployment (checkout-api@2.14.3)" },
+    { id: "notify", text: "Notified #payments-oncall" },
+    { id: "status", text: "Drafted customer status update" },
+  ];
+
+  const METRICS = [
+    {
+      key: "errors", label: "Failed requests", base: 0.3, incident: 12.4, mitigated: 2.1, resolved: 0.3,
+      baseText: "0.3%",
+      fmt: (v) => ({ v: v.toFixed(1), u: "%" }),
+      delta: (v) => `${(v - 0.3).toFixed(1)} pts`,
+    },
+    {
+      key: "latency", label: "p95 latency", base: 420, incident: 3800, mitigated: 780, resolved: 420,
+      baseText: "420ms",
+      fmt: (v) => v >= 1000 ? { v: (v / 1000).toFixed(1), u: "s" } : { v: String(Math.round(v)), u: "ms" },
+      delta: (v) => v - 420 >= 1000 ? `${((v - 420) / 1000).toFixed(1)}s` : `${Math.round(v - 420)}ms`,
+    },
+    {
+      key: "exceptions", label: "Exceptions / min", base: 12, incident: 214, mitigated: 40, resolved: 12,
+      baseText: "12/min",
+      fmt: (v) => ({ v: String(Math.round(v)), u: "" }),
+      delta: (v) => `${Math.round(v - 12)}`,
+    },
+    {
+      key: "failures", label: "Function failures", base: 0, incident: 38, mitigated: 6, resolved: 0,
+      baseText: "0",
+      fmt: (v) => ({ v: String(Math.round(v)), u: "" }),
+      delta: (v) => `${Math.round(v)}`,
+    },
+  ];
+
+  const BASE_TIMELINE = [
+    { off: -42, text: "Incident detected by Application Insights smart detection", src: "Application Insights" },
+    { off: -40, text: "Alert fired: checkout-api p95 latency > 2s for 5m", src: "Azure Monitor" },
+    { off: -38, text: "Correlated to deployment checkout-api@2.14.3", src: "Deployment" },
+    { off: -21, text: "checkout-processor failure rate 38% — retries exhausted", src: "Function App" },
+    { off: -12, text: "Auto-escalated to payments-oncall (P1 rotation)", src: "Azure Monitor" },
+  ];
+
+  const KQL = [
+    "requests",
+    '| where timestamp > ago(30m)',
+    '| where cloud_RoleName == "checkout-api"',
+    "| summarize failed = countif(success == false), total = count() by bin(timestamp, 1m)",
+    "| extend failureRate = round(100.0 * failed / total, 2)",
+    "| order by timestamp desc",
+  ].join("\n");
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function defaultState() {
+    return {
+      v: 1,
+      status: "new",
+      severity: SEV,
+      owner: OWNER,
+      startedAt: Date.now() - 42 * 60 * 1000,
+      resolvedAt: null,
+      notes: "",
+      checklist: { blast: true, deploy: false, notify: false, status: false },
+      timeline: [],
+      pages: 0,
+      handedOffAt: null,
+    };
+  }
+
+  let state = defaultState();
+  let applying = false;
+  let booted = false;
+  let openResources = new Set();
+  let series = {};
+  let noteTimer = null;
+  let lastSavedJson = "";
+
+  function targetFor(m) {
+    if (state.status === "resolved") return m.resolved;
+    if (state.status === "mitigated") return m.mitigated;
+    return m.incident;
+  }
+
+  function noise(m, target) {
+    const scale = Math.max(Math.abs(target) * 0.035, m.base * 0.02, 0.004);
+    return (Math.random() - 0.5) * 2 * scale;
+  }
+
+  function seedSeries(m) {
+    const target = targetFor(m);
+    const n = 26;
+    const arr = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      let v;
+      if (state.status === "resolved" || state.status === "mitigated") {
+        v = m.incident + (target - m.incident) * Math.min(1, t * 1.15);
+      } else {
+        v = target;
+      }
+      arr.push(Math.max(0, v + noise(m, target)));
+    }
+    return arr;
+  }
+
+  function seedAllSeries() {
+    series = {};
+    for (const m of METRICS) series[m.key] = seedSeries(m);
+  }
+
+  function reseedForStatus() {
+    for (const m of METRICS) {
+      const prev = series[m.key] || [];
+      const last = prev[prev.length - 1] ?? m.incident;
+      const target = targetFor(m);
+      const n = 26;
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const t = i / (n - 1);
+        const v = last + (target - last) * Math.min(1, t * 1.15);
+        arr.push(Math.max(0, v + noise(m, target)));
+      }
+      series[m.key] = arr;
+    }
+  }
+
+  function tickSeries() {
+    for (const m of METRICS) {
+      const arr = series[m.key];
+      const target = targetFor(m);
+      const last = arr[arr.length - 1] ?? target;
+      const next = Math.max(0, last + (target - last) * 0.32 + noise(m, target));
+      arr.push(next);
+      if (arr.length > 26) arr.shift();
+    }
+  }
+
+  const metricValue = (key) => {
+    const arr = series[key];
+    return arr && arr.length ? arr[arr.length - 1] : 0;
+  };
+
+  function classFor(m, v) {
+    if (state.status === "resolved") return "ok";
+    if (state.status === "mitigated") return "warn";
+    return v > m.base * 1.5 + 0.01 ? "danger" : v > m.base * 1.1 + 0.01 ? "warn" : "ok";
+  }
+
+  function spark(m, cls) {
+    const arr = series[m.key];
+    const W = 120, H = 30, P = 2;
+    const max = Math.max(m.base * 1.25, ...arr, 1);
+    const pts = arr.map((v, i) => {
+      const x = P + (i / (arr.length - 1)) * (W - P * 2);
+      const y = H - P - (Math.min(Math.max(v, 0), max) / max) * (H - P * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    const baseY = H - P - (Math.min(m.base, max) / max) * (H - P * 2);
+    const last = arr[arr.length - 1];
+    const lastY = H - P - (Math.min(Math.max(last, 0), max) / max) * (H - P * 2);
+    return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <line class="base" x1="${P}" y1="${baseY.toFixed(1)}" x2="${W - P}" y2="${baseY.toFixed(1)}" stroke-dasharray="2 3" />
+      <polyline points="${pts}" vector-effect="non-scaling-stroke" />
+      <circle cx="${W - P}" cy="${lastY.toFixed(1)}" r="1.7" />
+    </svg>`;
+  }
+
+  function fmtTime(ms) {
+    const d = new Date(ms);
+    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  }
+
+  function fmtElapsed(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h >= 24) return `${Math.floor(h / 24)}d ${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  function mergedTimeline() {
+    const base = BASE_TIMELINE.map((e) => ({ at: state.startedAt + e.off * 60000, text: e.text, src: e.src }));
+    const user = Array.isArray(state.timeline) ? state.timeline : [];
+    return base.concat(user).sort((a, b) => b.at - a.at);
+  }
+
+  function srcClass(src) {
+    if (src === "Application Insights") return "src-ai";
+    if (src === "Function App") return "src-fn";
+    if (src === "Azure Monitor") return "src-mon";
+    if (src === "Deployment") return "src-dep";
+    if (src === "agent") return "src-agent";
+    return "src-you";
+  }
+
+  function addTimeline(text, src) {
+    if (!Array.isArray(state.timeline)) state.timeline = [];
+    state.timeline.push({ at: Date.now(), text, src });
+    if (state.timeline.length > 40) state.timeline = state.timeline.slice(-40);
+  }
+
+  function nextStatus() {
+    if (state.status === "new") return "acknowledged";
+    if (state.status === "acknowledged") return "mitigated";
+    if (state.status === "mitigated") return "resolved";
+    return "acknowledged";
+  }
+
+  function nextLabel() {
+    if (state.status === "new") return "Acknowledge incident";
+    if (state.status === "acknowledged") return "Mark mitigated";
+    if (state.status === "mitigated") return "Resolve incident";
+    return "Reopen incident";
+  }
+
+  function applyStatus(next, by) {
+    const prev = state.status;
+    state.status = next;
+    if (next === "resolved") state.resolvedAt = Date.now();
+    else state.resolvedAt = null;
+    const text = next === "resolved"
+      ? "Incident resolved — error rate back to baseline"
+      : next === "mitigated"
+        ? "Mitigation applied — rolling back checkout-api@2.14.3"
+        : next === "acknowledged"
+          ? "Acknowledged — investigating connection pool saturation"
+          : "Incident reopened — investigating";
+    addTimeline(text, by === "agent" ? "agent" : "you");
+    return prev;
+  }
+
+  function saveState() {
+    const snapshot = JSON.parse(JSON.stringify(state));
+    lastSavedJson = JSON.stringify(snapshot);
+    return canvas.state.set(snapshot).catch((err) => {
+      console.warn("[incident] save failed", err);
+      $("foot-status").textContent = "save failed";
+    });
+  }
+
+  function renderHeader() {
+    const st = STATUS[state.status] || STATUS.new;
+    const statusEl = $("status");
+    statusEl.textContent = st.label;
+    statusEl.className = "chip status " + st.cls;
+    $("hd").style.setProperty("--hd-accent", st.color);
+    $("owner").textContent = state.owner || OWNER;
+    $("started").textContent = `started ${fmtTime(state.startedAt)} UTC`;
+    $("clock-label").textContent = state.status === "resolved" ? "DURATION" : "ELAPSED";
+    $("advance").textContent = nextLabel();
+    const live = $("live");
+    live.classList.toggle("closed", state.status === "resolved");
+    $("live-label").textContent = state.status === "resolved" ? "closed" : "live";
+    document.title = `${INC} · ${st.label} — ${TITLE}`;
+  }
+
+  function renderKpis() {
+    $("kpis").innerHTML = METRICS.map((m) => {
+      const v = metricValue(m.key);
+      const { v: val, u } = m.fmt(v);
+      const cls = classFor(m, v);
+      const diff = v - m.base;
+      const atBase = diff <= Math.max(m.base * 0.02, 0.001);
+      const delta = state.status === "resolved" || atBase ? "at baseline" : `↑ ${m.delta(v)}`;
+      return `<div class="kpi ${cls}">
+        <div class="kpi-top"><span class="kpi-label">${esc(m.label)}</span><span class="kpi-delta">${delta}</span></div>
+        <div class="kpi-val">${val}${u ? `<span class="unit">${u}</span>` : ""}</div>
+        ${spark(m, cls)}
+        <div class="kpi-base">baseline ${esc(m.baseText)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderResources() {
+    const errs = metricValue("errors");
+    const fails = metricValue("failures");
+    const resolved = state.status === "resolved";
+    const mitigated = state.status === "mitigated";
+    const degraded = resolved ? "ok" : mitigated ? "warn" : "err";
+    const degradedLabel = resolved ? "Healthy" : mitigated ? "Recovering" : "Degraded";
+
+    const rows = [
+      {
+        id: "ai", name: "checkout-ai-prod", kind: "Application Insights", cls: degraded,
+        metric: `${errs.toFixed(1)}% failed requests · 15m`, label: degradedLabel,
+        detail: `<div class="detail-row"><span class="detail-label">Last exception</span><span>TimeoutError · 14:38:54</span></div>
+          <div class="detail-note">Upstream connection pool exhausted (10/10 in use). 92% of failures come from checkout-api.</div>
+          <div class="detail-row" style="margin-top:7px"><span class="detail-label">KQL</span><button class="mini-btn" data-copy-kql>Copy query</button></div>
+          <pre>${esc(KQL)}</pre>`,
+      },
+      {
+        id: "processor", name: "checkout-processor", kind: "Function App", cls: degraded,
+        metric: `${Math.round(fails)} failed executions · 5m`, label: degradedLabel,
+        detail: `<div class="detail-row"><span class="detail-label">Recent invocations</span><span>38 failed / 1,204 total</span></div>
+          <pre>14:39:12  ERROR  TimeoutError: connection pool exhausted (10/10 in use)
+14:39:08  WARN   retry 3/3 for order 88213 — giving up
+14:38:54  ERROR  Function invocation failed (duration 28.4s)</pre>`,
+      },
+      {
+        id: "webhook", name: "payment-webhook", kind: "Function App", cls: resolved ? "ok" : "warn",
+        metric: resolved ? "0 retries queued" : mitigated ? "Draining · 180" : "Retry backlog 1.2k",
+        label: resolved ? "Healthy" : mitigated ? "Draining" : "Backlogged",
+        detail: `<div class="detail-row"><span class="detail-label">Retry queue</span><span>${resolved ? "empty" : mitigated ? "draining" : "backlog growing"}</span></div>
+          <pre>14:39:20  WARN   downstream 429 from payments-gateway
+14:39:16  INFO   retry batch 8841 scheduled (backoff 2s)
+14:38:58  WARN   queue depth 1,204 — soft limit 1,000</pre>`,
+      },
+      {
+        id: "router", name: "order-router", kind: "Function App", cls: "ok",
+        metric: "Healthy · 1.3k invocations", label: "Healthy",
+        detail: `<div class="detail-note">No errors in the last 60 minutes. 1,284 successful invocations; p95 118ms.</div>`,
+      },
+    ];
+
+    $("resources").innerHTML = rows.map((r) => `
+      <button class="res ${r.cls} ${openResources.has(r.id) ? "open" : ""}" data-res="${r.id}">
+        <span class="res-dot"></span>
+        <span class="res-main"><span class="res-name">${esc(r.name)}</span><span class="res-kind">${esc(r.kind)}</span></span>
+        <span class="res-metric">${esc(r.metric)}</span>
+        <span class="res-state ${r.cls}">${esc(r.label)}</span>
+        <span class="chev">›</span>
+      </button>
+      <div class="res-detail ${openResources.has(r.id) ? "open" : ""}">${r.detail}</div>
+    `).join("");
+  }
+
+  function renderTimeline() {
+    const all = mergedTimeline();
+    $("timeline").innerHTML = all.map((e) => `
+      <div class="tl">
+        <span class="tl-time">${fmtTime(e.at)}</span>
+        <span class="tl-dot ${srcClass(e.src)}"></span>
+        <div class="tl-body"><div class="tl-text">${esc(e.text)}</div><div class="tl-src">${esc(e.src)}</div></div>
+      </div>`).join("");
+    $("tlcount").textContent = `${all.length} events · UTC`;
+    $("timeline").scrollTop = 0;
+  }
+
+  function renderChecklist() {
+    const done = CHECK_ITEMS.filter((i) => state.checklist && state.checklist[i.id]).length;
+    $("checklist").innerHTML = CHECK_ITEMS.map((i) => `
+      <label class="check ${state.checklist && state.checklist[i.id] ? "done" : ""}">
+        <input type="checkbox" data-check="${i.id}" ${state.checklist && state.checklist[i.id] ? "checked" : ""} />
+        <span class="txt">${esc(i.text)}</span>
+        ${state.checklist && state.checklist[i.id] ? `<span class="who">done</span>` : ""}
+      </label>`).join("");
+    $("triage-count").textContent = `${done}/${CHECK_ITEMS.length}`;
+  }
+
+  function renderAll(opts = {}) {
+    renderHeader();
+    renderKpis();
+    renderResources();
+    renderTimeline();
+    renderChecklist();
+    if (opts.syncNote) $("note").value = state.notes || "";
+    updateClock();
+  }
+
+  function updateClock() {
+    const end = state.status === "resolved" && state.resolvedAt ? state.resolvedAt : Date.now();
+    $("elapsed").textContent = fmtElapsed(end - state.startedAt);
+  }
+
+  function buildSummary() {
+    const st = STATUS[state.status] || STATUS.new;
+    const end = state.status === "resolved" && state.resolvedAt ? state.resolvedAt : Date.now();
+    const lines = [];
+    lines.push(`## ${INC} — ${TITLE}`);
+    lines.push("");
+    lines.push(`**Status:** ${st.label} · **Severity:** ${SEV} · **Owner:** ${state.owner || OWNER}`);
+    lines.push(`**Elapsed:** ${fmtElapsed(end - state.startedAt)} · **Started:** ${fmtTime(state.startedAt)} UTC`);
+    lines.push("");
+    lines.push("### Impact");
+    for (const m of METRICS) {
+      const v = metricValue(m.key);
+      const { v: val, u } = m.fmt(v);
+      lines.push(`- ${m.label}: ${val}${u} (baseline ${m.baseText})`);
+    }
+    lines.push("");
+    lines.push("### Affected resources");
+    lines.push(`- checkout-ai-prod (Application Insights) — ${state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Recovering" : "Degraded"}`);
+    lines.push(`- checkout-processor (Function App) — ${state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Recovering" : "Degraded"}`);
+    lines.push(`- payment-webhook (Function App) — ${state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Draining" : "Backlogged"}`);
+    lines.push("- order-router (Function App) — Healthy");
+    lines.push("");
+    lines.push("### Timeline");
+    for (const e of mergedTimeline().slice(0, 8)) lines.push(`- ${fmtTime(e.at)} — ${e.text} (${e.src})`);
+    lines.push("");
+    lines.push("### Triage");
+    for (const i of CHECK_ITEMS) lines.push(`- [${state.checklist && state.checklist[i.id] ? "x" : " "}] ${i.text}`);
+    lines.push("");
+    lines.push("### Notes");
+    lines.push(state.notes && state.notes.trim() ? state.notes.trim() : "_No notes yet._");
+    return lines.join("\n");
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function showOverlay(title, text) {
+    $("overlay-title").textContent = title;
+    $("overlay-text").value = text;
+    $("overlay").classList.add("open");
+    setTimeout(() => { $("overlay-text").focus(); $("overlay-text").select(); }, 0);
+  }
+
+  function closeOverlay() {
+    $("overlay").classList.remove("open");
+  }
+
+  // ---- interactions ---------------------------------------------------------
+
+  $("advance").addEventListener("click", () => {
+    const from = state.status;
+    const to = nextStatus();
+    applying = true;
+    applyStatus(to, "you");
+    reseedForStatus();
+    renderAll();
+    saveState();
+    applying = false;
+    const type = to === "acknowledged" && from === "resolved" ? "reopen"
+      : to === "acknowledged" ? "acknowledge"
+      : to === "mitigated" ? "mitigate"
+      : "resolve";
+    canvas.emit(type, {
+      incident: INC,
+      title: TITLE,
+      severity: SEV,
+      from,
+      to,
+      elapsed: fmtElapsed((state.resolvedAt || Date.now()) - state.startedAt),
+      note: state.notes ? state.notes.slice(0, 300) : undefined,
+    });
+    canvas.notify(
+      to === "acknowledged" ? "Acknowledged — agent can read this" :
+      to === "mitigated" ? "Marked mitigated — metrics recovering" :
+      to === "resolved" ? "Resolved — timer stopped" :
+      "Reopened"
+    );
+    $("foot-status").textContent = "saved";
+  });
+
+  $("page").addEventListener("click", () => {
+    state.pages = (state.pages || 0) + 1;
+    addTimeline("Paged payments-oncall (P1 escalation)", "you");
+    renderAll();
+    saveState();
+    canvas.emit("page_oncall", {
+      incident: INC,
+      severity: SEV,
+      pages: state.pages,
+      status: state.status,
+      elapsed: fmtElapsed((state.resolvedAt || Date.now()) - state.startedAt),
+    });
+    canvas.notify("On-call paged");
+    $("foot-status").textContent = "on-call paged";
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const md = buildSummary();
+    const ok = await copyText(md);
+    canvas.emit("summary_copied", { incident: INC, status: state.status, markdown: md.slice(0, 4000) });
+    if (ok) canvas.notify("Incident summary copied");
+    else { showOverlay("Incident summary", md); canvas.notify("Copy blocked — select and copy"); }
+    $("foot-status").textContent = ok ? "summary copied" : "select to copy";
+  });
+
+  $("handoff").addEventListener("click", () => {
+    state.handedOffAt = Date.now();
+    addTimeline("Incident summary handed to agent for analysis", "you");
+    renderAll();
+    saveState();
+    const done = CHECK_ITEMS.filter((i) => state.checklist && state.checklist[i.id]).length;
+    canvas.emit("handoff", {
+      incident: INC,
+      title: TITLE,
+      severity: SEV,
+      status: state.status,
+      owner: state.owner || OWNER,
+      startedAt: new Date(state.startedAt).toISOString(),
+      elapsed: fmtElapsed((state.resolvedAt || Date.now()) - state.startedAt),
+      impact: METRICS.map((m) => {
+        const v = metricValue(m.key);
+        const { v: val, u } = m.fmt(v);
+        return { metric: m.label, value: `${val}${u}`, baseline: m.baseText };
+      }),
+      affected: [
+        { resource: "checkout-ai-prod", kind: "Application Insights", state: state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Recovering" : "Degraded" },
+        { resource: "checkout-processor", kind: "Function App", state: state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Recovering" : "Degraded" },
+        { resource: "payment-webhook", kind: "Function App", state: state.status === "resolved" ? "Healthy" : state.status === "mitigated" ? "Draining" : "Backlogged" },
+        { resource: "order-router", kind: "Function App", state: "Healthy" },
+      ],
+      checklist: { completed: done, total: CHECK_ITEMS.length, items: CHECK_ITEMS.map((i) => ({ item: i.text, done: !!(state.checklist && state.checklist[i.id]) })) },
+      notes: state.notes || "",
+      timeline: mergedTimeline().slice(0, 6).map((e) => ({ at: new Date(e.at).toISOString(), text: e.text, source: e.src })),
+      summary: buildSummary(),
+    });
+    canvas.notify("Incident handed to agent — ask it what it sees");
+    $("foot-status").textContent = "handed to agent";
+  });
+
+  $("reset").addEventListener("click", () => {
+    state = defaultState();
+    openResources.clear();
+    seedAllSeries();
+    renderAll({ syncNote: true });
+    saveState();
+    canvas.emit("demo_reset", { incident: INC });
+    canvas.notify("Incident demo reset");
+    $("foot-status").textContent = "reset";
+  });
+
+  $("save-note").addEventListener("click", () => {
+    const text = $("note").value.slice(0, 4000);
+    state.notes = text;
+    saveState();
+    canvas.emit("note_saved", { incident: INC, note: text.slice(0, 2000), chars: text.length });
+    canvas.notify("Note saved — agent can read it");
+    $("note-hint").textContent = "saved to agent";
+    $("foot-status").textContent = "note saved";
+  });
+
+  $("note").addEventListener("input", () => {
+    $("note-hint").textContent = "saving…";
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => {
+      state.notes = $("note").value.slice(0, 4000);
+      saveState();
+      $("note-hint").textContent = "autosaved";
+    }, 700);
+  });
+
+  $("resources").addEventListener("click", async (e) => {
+    const copy = e.target.closest("[data-copy-kql]");
+    if (copy) {
+      const ok = await copyText(KQL);
+      canvas.emit("query_copied", { incident: INC, query: "checkout failure rate" });
+      canvas.notify(ok ? "KQL copied" : "Copy blocked — query shown in the row");
+      return;
+    }
+    const row = e.target.closest(".res");
+    if (!row) return;
+    const id = row.dataset.res;
+    if (openResources.has(id)) openResources.delete(id);
+    else openResources.add(id);
+    renderResources();
+  });
+
+  $("checklist").addEventListener("change", (e) => {
+    const id = e.target.dataset.check;
+    if (!id) return;
+    state.checklist = state.checklist || {};
+    state.checklist[id] = e.target.checked;
+    renderChecklist();
+    saveState();
+    const done = CHECK_ITEMS.filter((i) => state.checklist[i.id]).length;
+    const item = CHECK_ITEMS.find((i) => i.id === id);
+    canvas.emit("checklist_toggle", {
+      incident: INC,
+      item: id,
+      label: item ? item.text : id,
+      done: e.target.checked,
+      completed: done,
+      total: CHECK_ITEMS.length,
+    });
+    $("foot-status").textContent = "triage updated";
+  });
+
+  $("overlay-close").addEventListener("click", closeOverlay);
+  $("overlay-done").addEventListener("click", closeOverlay);
+  $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeOverlay(); });
+  $("overlay-copy").addEventListener("click", async () => {
+    const ok = await copyText($("overlay-text").value);
+    canvas.notify(ok ? "Copied" : "Select the text and copy");
+  });
+
+  // The agent can push state with set_ui_state({...}):
+  //   { status: "acknowledged" | "mitigated" | "resolved" }  -> applied live
+  //   { agentNote: "..." }                                   -> appended to the timeline
+  //   { assignee: "..." } / { notes: "..." }                  -> updates owner / notes
+  // A full state object (startedAt + timeline + checklist changed) replaces the whole app.
+  canvas.on("state", (next) => {
+    if (!booted || applying || !next || typeof next !== "object") return;
+    if (JSON.stringify(next) === lastSavedJson) return; // our own save echoing back
+    const structural = (s) => JSON.stringify({ startedAt: s.startedAt, checklist: s.checklist, timeline: s.timeline });
+    const isFull = next.startedAt && next.checklist && Array.isArray(next.timeline) && structural(next) !== structural(state);
+    let changed = false;
+    let syncNote = false;
+    let statusChanged = false;
+
+    if (isFull) {
+      const base = defaultState();
+      state = {
+        ...base,
+        ...next,
+        checklist: { ...base.checklist, ...(next.checklist || {}) },
+        timeline: Array.isArray(next.timeline) ? next.timeline : [],
+      };
+      if (!STATUS[state.status]) state.status = "new";
+      changed = true;
+      syncNote = true;
+    } else {
+      if (next.status && next.status !== state.status && STATUS[next.status]) {
+        applyStatus(next.status, "agent");
+        changed = true;
+        statusChanged = true;
+      }
+      if (next.assignee && next.assignee !== state.owner) {
+        state.owner = String(next.assignee);
+        changed = true;
+      }
+      if (typeof next.notes === "string" && next.notes !== state.notes) {
+        state.notes = next.notes;
+        changed = true;
+        syncNote = true;
+      }
+    }
+    if (next.agentNote) {
+      addTimeline(String(next.agentNote), "agent");
+      delete state.agentNote;
+      changed = true;
+    }
+    if (!changed) return;
+    if (isFull) seedAllSeries();
+    else if (statusChanged) reseedForStatus();
+    applying = true;
+    renderAll({ syncNote });
+    saveState();
+    applying = false;
+    $("foot-status").textContent = "updated by agent";
+    canvas.notify("Incident updated by agent");
+  });
+
+  // ---- boot -----------------------------------------------------------------
+  canvas.ready.then((saved) => {
+    const base = defaultState();
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      state = {
+        ...base,
+        ...saved,
+        checklist: { ...base.checklist, ...(saved.checklist || {}) },
+        timeline: Array.isArray(saved.timeline) ? saved.timeline : [],
+      };
+      if (!STATUS[state.status]) state.status = "new";
+      if (!state.startedAt) state.startedAt = base.startedAt;
+    } else {
+      state = base;
+      saveState();
+    }
+    if (state.agentNote) {
+      addTimeline(String(state.agentNote), "agent");
+      delete state.agentNote;
+      saveState();
+    }
+    seedAllSeries();
+    renderAll({ syncNote: true });
+    updateClock();
+    setInterval(updateClock, 1000);
+    setInterval(() => { tickSeries(); renderKpis(); renderResources(); }, 4000);
+    canvas.autosize();
+    booted = true;
+    lastSavedJson = JSON.stringify(state);
+  });
+})();
+</script>
+</body>
+</html>

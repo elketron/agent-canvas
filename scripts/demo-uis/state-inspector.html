@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
+<title>State inspector</title>
+<style>
+  :root {
+    --bg: #0e0e0f; --surface: #171718; --surface2: #1a1a1c; --border: #222224; --border2: #2a2a2c;
+    --fg: #c2c0b6; --bright: #d8d6cc; --dim: #8a8880; --faint: #6a6865; --accent: #8a82cc; --ok: #4CAF82;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+    font: 13px/1.5 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  h1 { margin: 0 0 2px; font-size: 14px; color: var(--bright); font-weight: 600; }
+  .sub { margin: 0 0 14px; color: var(--faint); font-size: 11px; }
+  .counter { display: flex; align-items: center; gap: 10px; }
+  .counter .value { font-size: 34px; font-weight: 600; color: var(--bright); min-width: 74px; text-align: center; letter-spacing: -.03em; }
+  button {
+    border: 1px solid var(--border); background: var(--surface); color: var(--fg); border-radius: 7px;
+    padding: 8px 12px; font: 500 12px/1 inherit; cursor: pointer;
+  }
+  button:hover { background: var(--surface2); }
+  button.round { width: 38px; padding: 8px 0; font-size: 16px; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row button { flex: 1; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .stat { border: 1px solid var(--border); background: var(--surface); border-radius: 7px; padding: 8px 10px; }
+  .stat .k { font-size: 9.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); }
+  .stat .v { font-size: 16px; color: var(--bright); }
+  pre {
+    margin: 12px 0 0; padding: 10px; background: #0a0a0b; border: 1px solid var(--border); border-radius: 7px;
+    color: var(--dim); font: 11px/1.45 inherit; white-space: pre-wrap; word-break: break-word; max-height: 96px; overflow: auto;
+  }
+  .hint { margin-top: 8px; font-size: 10.5px; color: var(--faint); }
+</style>
+</head>
+<body>
+  <h1>State survives reloads</h1>
+  <p class="sub">Each reload bumps “mounts”. Content edits reload the app; the counter keeps counting.</p>
+
+  <div class="counter">
+    <button class="round" id="dec" title="Decrease">−</button>
+    <span class="value" id="count">0</span>
+    <button class="round" id="inc" title="Increase">＋</button>
+  </div>
+
+  <div class="row">
+    <button id="reset">Reset</button>
+    <button id="send">Send state to agent →</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">mounts</div><div class="v" id="mounts">0</div></div>
+    <div class="stat"><div class="k">saved</div><div class="v" id="saved">—</div></div>
+    <div class="stat"><div class="k">mode</div><div class="v" id="mode">canvas</div></div>
+  </div>
+
+  <pre id="json">{}</pre>
+  <p class="hint">Open ↗ to run it standalone — same state, same server.</p>
+
+<script>
+  const DEFAULTS = { count: 0, mounts: 0, updatedAt: null };
+  let state = { ...DEFAULTS, mounts: 1 };
+  let saves = 0;
+
+  const el = (id) => document.getElementById(id);
+
+  function sync() {
+    el("count").textContent = state.count;
+    el("mounts").textContent = state.mounts;
+    el("saved").textContent = saves ? saves + "×" : "—";
+    el("mode").textContent = canvas.standalone ? "page" : "canvas";
+    el("json").textContent = JSON.stringify(state, null, 2);
+    canvas.autosize();
+  }
+
+  async function commit(next) {
+    state = { ...state, ...next, updatedAt: Date.now() };
+    sync();
+    await canvas.state.set(state);
+    saves++;
+    sync();
+  }
+
+  el("inc").onclick = () => commit({ count: state.count + 1 });
+  el("dec").onclick = () => commit({ count: state.count - 1 });
+  el("reset").onclick = () => commit({ ...DEFAULTS, mounts: state.mounts });
+  el("send").onclick = () => {
+    canvas.emit("counter:state", { count: state.count, mounts: state.mounts });
+    canvas.notify("Counter state sent to the agent");
+  };
+
+
+  canvas.on("state", (next) => {
+    if (!next || typeof next !== "object") return;
+    state = { ...DEFAULTS, ...next };
+    sync();
+  });
+
+  canvas.ready.then(async (saved) => {
+    state = { ...DEFAULTS, ...(saved && typeof saved === "object" ? saved : {}) };
+    state.mounts = (Number(state.mounts) || 0) + 1;
+    sync();
+    await canvas.state.set(state);
+  });
+</script>
+</body>
+</html>

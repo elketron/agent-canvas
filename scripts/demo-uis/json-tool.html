@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
+<title>JSON tool</title>
+<style>
+  :root {
+    --bg: #0e0e0f; --surface: #171718; --surface2: #1a1a1c; --border: #222224; --border2: #2a2a2c;
+    --fg: #c2c0b6; --bright: #d8d6cc; --dim: #8a8880; --faint: #6a6865;
+    --accent: #8a82cc; --ok: #4CAF82; --err: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+    font: 12.5px/1.5 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  h1 { margin: 0; font-size: 14px; color: var(--bright); font-weight: 600; }
+  .status { font-size: 11px; color: var(--faint); margin-left: auto; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  textarea {
+    width: 100%; height: 210px; resize: vertical; padding: 10px 11px; background: #0a0a0b; color: var(--fg);
+    border: 1px solid var(--border); border-radius: 8px; font: 12px/1.5 inherit; outline: none; tab-size: 2;
+  }
+  textarea:focus { border-color: var(--border2); }
+  .row { display: flex; gap: 7px; margin-top: 9px; }
+  button {
+    border: 1px solid var(--border); background: var(--surface); color: var(--fg); border-radius: 7px;
+    padding: 7px 11px; font: 500 11.5px/1 inherit; cursor: pointer;
+  }
+  button:hover { background: var(--surface2); }
+  button.primary { margin-left: auto; border-color: #2a2740; background: #12111a; color: var(--accent); }
+  .errmsg { margin-top: 8px; color: var(--err); font-size: 11px; min-height: 16px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>JSON</h1>
+    <span class="status" id="status">ready</span>
+  </div>
+
+  <textarea id="input" spellcheck="false" placeholder='Paste JSON here… e.g. {"hello": "canvas", "n": 3}'></textarea>
+
+  <div class="row">
+    <button id="pretty">Pretty</button>
+    <button id="minify">Minify</button>
+    <button id="copy">Copy</button>
+    <button id="send" class="primary" title="Send the parsed value to the agent">Send to agent →</button>
+  </div>
+  <div class="errmsg" id="err"></div>
+
+<script>
+  const SAMPLE = '{"name":"agent-canvas","interactive":true,"nodes":["plan","gate","counter"],"version":2}';
+  const DEFAULTS = { input: SAMPLE };
+
+  let state = { ...DEFAULTS };
+  const el = (id) => document.getElementById(id);
+
+  function status(text, cls) {
+    el("status").textContent = text;
+    el("status").className = "status" + (cls ? " " + cls : "");
+  }
+
+  function parse() {
+    try {
+      const value = JSON.parse(el("input").value);
+      el("err").textContent = "";
+      status("valid · " + el("input").value.length + " chars", "ok");
+      return { ok: true, value };
+    } catch (e) {
+      el("err").textContent = String(e.message || e);
+      status("invalid", "err");
+      return { ok: false, error: String(e.message || e) };
+    }
+  }
+
+  el("input").addEventListener("input", () => {
+    state.input = el("input").value;
+    parse();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => canvas.state.set(state), 250);
+  });
+
+  let saveTimer;
+  el("pretty").onclick = () => {
+    const p = parse();
+    if (!p.ok) return;
+    el("input").value = JSON.stringify(p.value, null, 2);
+    el("input").dispatchEvent(new Event("input"));
+  };
+  el("minify").onclick = () => {
+    const p = parse();
+    if (!p.ok) return;
+    el("input").value = JSON.stringify(p.value);
+    el("input").dispatchEvent(new Event("input"));
+  };
+  el("copy").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(el("input").value);
+      canvas.notify("Copied JSON to clipboard");
+      status("copied", "ok");
+    } catch {
+      el("input").select();
+      document.execCommand("copy");
+      status("copied", "ok");
+    }
+  };
+  el("send").onclick = () => {
+    const p = parse();
+    if (!p.ok) {
+      canvas.notify("Fix the JSON before sending");
+      return;
+    }
+    canvas.emit("json:send", { value: p.value });
+    canvas.notify("JSON sent to the agent");
+    status("sent ✓", "ok");
+  };
+
+  canvas.on("state", (next) => {
+    if (!next || typeof next !== "object") return;
+    state = { ...DEFAULTS, ...next };
+    el("input").value = state.input ?? "";
+    parse();
+  });
+
+  canvas.ready.then((saved) => {
+    if (saved && typeof saved === "object") state = { ...DEFAULTS, ...saved };
+    el("input").value = state.input ?? SAMPLE;
+    parse();
+    canvas.autosize();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
+<title>Plan builder</title>
+<style>
+  :root {
+    --bg: #0e0e0f; --surface: #171718; --surface2: #1a1a1c; --border: #222224; --border2: #2a2a2c;
+    --fg: #c2c0b6; --bright: #d8d6cc; --dim: #8a8880; --faint: #6a6865;
+    --accent: #8a82cc; --accent-deep: #12111a; --accent-border: #2a2740; --ok: #4CAF82;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px 18px 16px; background: var(--bg); color: var(--fg);
+    font: 13px/1.45 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; color: var(--bright); letter-spacing: .01em; }
+  .sub { margin: 3px 0 16px; font-size: 11.5px; color: var(--faint); }
+  .label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 16px 0 7px; }
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .plan {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 10px 11px;
+    cursor: pointer; text-align: left; color: inherit; font: inherit; transition: border-color .12s, background .12s;
+  }
+  .plan:hover { background: var(--surface2); }
+  .plan.on { border-color: var(--accent-border); background: var(--accent-deep); }
+  .plan .name { font-size: 12.5px; color: var(--bright); display: flex; justify-content: space-between; align-items: center; }
+  .plan.on .name { color: var(--accent); }
+  .plan .price { margin-top: 3px; font-size: 11px; color: var(--faint); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--border2); }
+  .plan.on .dot { background: var(--accent); border-color: var(--accent); }
+  .row { display: flex; align-items: center; gap: 12px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); height: 18px; }
+  .seats { min-width: 74px; text-align: right; font-size: 12px; color: var(--bright); }
+  .addons { display: grid; gap: 6px; }
+  .addon {
+    display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 7px; padding: 8px 10px; cursor: pointer; font-size: 12px;
+  }
+  .addon:hover { background: var(--surface2); }
+  .addon input { accent-color: var(--accent); margin: 0; }
+  .addon .grow { flex: 1; }
+  .addon .price { color: var(--faint); font-size: 11px; }
+  .annual { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 12px; cursor: pointer; }
+  .annual input { accent-color: var(--accent); margin: 0; }
+  .annual .save { color: var(--ok); font-size: 10.5px; }
+  .total { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .total .line { display: flex; justify-content: space-between; color: var(--dim); font-size: 11.5px; padding: 2px 0; }
+  .total .line.discount { color: var(--ok); }
+  .total .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; color: var(--bright); }
+  .total .sum .num { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+  .total .sum .per { font-size: 11px; color: var(--faint); font-weight: 400; }
+  .foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  button.send {
+    flex: 1; border: 1px solid var(--accent-border); background: var(--accent-deep); color: var(--accent);
+    border-radius: 8px; padding: 10px 12px; font: 600 12px/1 inherit; cursor: pointer;
+  }
+  button.send:hover { background: #171528; border-color: #3a3660; }
+  button.send:disabled { opacity: .55; cursor: default; }
+  .sent { font-size: 10.5px; color: var(--faint); min-width: 120px; text-align: right; }
+  .sent.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+  <h1>New workspace</h1>
+  <p class="sub">Pick a plan — everything below is live and saved to the canvas.</p>
+
+  <div class="label">Plan</div>
+  <div class="plans" id="plans"></div>
+
+  <div class="label">Seats</div>
+  <div class="row">
+    <input id="seats" type="range" min="1" max="50" />
+    <span class="seats" id="seatsLabel"></span>
+  </div>
+
+  <div class="label">Add-ons</div>
+  <div class="addons" id="addons"></div>
+
+  <label class="annual">
+    <input id="annual" type="checkbox" />
+    <span>Bill annually</span>
+    <span class="save">−20%</span>
+  </label>
+
+  <div class="total">
+    <div class="line"><span id="seatLine">Seats</span><span id="seatCost"></span></div>
+    <div class="line"><span>Add-ons</span><span id="addonCost"></span></div>
+    <div class="line discount" id="discountLine"><span>Annual discount</span><span id="discount"></span></div>
+    <div class="sum"><span>Total</span><span><span class="num" id="monthly"></span> <span class="per">/ month</span></span></div>
+  </div>
+
+  <div class="foot">
+    <button class="send" id="send">Send to agent →</button>
+    <span class="sent" id="sent"></span>
+  </div>
+
+<script>
+  const DEFAULTS = {
+    plan: "team",
+    seats: 12,
+    addons: { sso: false, audit: true, support: false },
+    annual: true,
+    lastSubmitted: null,
+  };
+  const PLANS = {
+    starter: { name: "Starter", price: 0 },
+    team: { name: "Team", price: 12 },
+    scale: { name: "Scale", price: 28 },
+  };
+  const ADDONS = {
+    sso: { label: "SSO & SCIM", per: "seat", price: 6, note: "$6 / seat" },
+    audit: { label: "Audit log", per: "seat", price: 3, note: "$3 / seat" },
+    support: { label: "Priority support", per: "flat", price: 400, note: "$400 / mo" },
+  };
+
+  let state = structuredClone(DEFAULTS);
+
+  const el = (id) => document.getElementById(id);
+  const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+  const perSeat = () => PLANS[state.plan].price + (state.addons.sso ? ADDONS.sso.price : 0) + (state.addons.audit ? ADDONS.audit.price : 0);
+
+  function renderPlans() {
+    el("plans").innerHTML = Object.entries(PLANS).map(([key, p]) => `
+      <button class="plan ${state.plan === key ? "on" : ""}" data-plan="${key}">
+        <span class="name">${p.name}<span class="dot"></span></span>
+        <span class="price">${p.price ? "$" + p.price + " / seat" : "Free forever"}</span>
+      </button>`).join("");
+    for (const b of el("plans").querySelectorAll("[data-plan]")) {
+      b.onclick = () => { state.plan = b.dataset.plan; sync(); save(); };
+    }
+  }
+
+  function renderAddons() {
+    el("addons").innerHTML = Object.entries(ADDONS).map(([key, a]) => `
+      <label class="addon">
+        <input type="checkbox" data-addon="${key}" ${state.addons[key] ? "checked" : ""} />
+        <span class="grow">${a.label}</span>
+        <span class="price">${a.note}</span>
+      </label>`).join("");
+    for (const input of el("addons").querySelectorAll("[data-addon]")) {
+      input.onchange = () => { state.addons[input.dataset.addon] = input.checked; sync(); save(); };
+    }
+  }
+
+  function compute() {
+    const seatTotal = PLANS[state.plan].price * state.seats;
+    let addonTotal = 0;
+    for (const [key, a] of Object.entries(ADDONS)) {
+      if (!state.addons[key]) continue;
+      addonTotal += a.per === "seat" ? a.price * state.seats : a.price;
+    }
+    const gross = seatTotal + addonTotal;
+    const discount = state.annual ? gross * 0.2 : 0;
+    return { seatTotal, addonTotal, discount, monthly: gross - discount };
+  }
+
+  function sync() {
+    renderPlans();
+    renderAddons();
+    el("seats").value = state.seats;
+    el("seatsLabel").textContent = state.seats + (state.seats === 1 ? " seat" : " seats");
+    el("annual").checked = state.annual;
+    const t = compute();
+    el("seatLine").textContent = `${PLANS[state.plan].name} seats (${state.seats} × ${money(PLANS[state.plan].price)})`;
+    el("seatCost").textContent = money(t.seatTotal);
+    el("addonCost").textContent = money(t.addonTotal);
+    el("discount").textContent = "−" + money(t.discount);
+    el("discountLine").style.display = state.annual ? "" : "none";
+    el("monthly").textContent = money(t.monthly);
+    el("sent").textContent = state.lastSubmitted ? "Last sent " + new Date(state.lastSubmitted).toLocaleTimeString() : "Not sent yet";
+    el("sent").className = "sent" + (state.lastSubmitted ? " ok" : "");
+    canvas.autosize();
+  }
+
+  let saveTimer;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => canvas.state.set(state).catch((e) => console.warn("could not save", e)), 120);
+  }
+
+  el("seats").oninput = () => { state.seats = Number(el("seats").value); sync(); save(); };
+  el("annual").onchange = () => { state.annual = el("annual").checked; sync(); save(); };
+
+  el("send").onclick = async () => {
+    const btn = el("send");
+    btn.disabled = true;
+    state.lastSubmitted = Date.now();
+    await canvas.state.set(state);
+    canvas.emit("plan:submit", {
+      plan: state.plan,
+      planName: PLANS[state.plan].name,
+      seats: state.seats,
+      addons: Object.keys(state.addons).filter((k) => state.addons[k]),
+      billing: state.annual ? "annual" : "monthly",
+      monthlyTotal: Math.round(compute().monthly),
+      effectivePerSeat: Math.round(perSeat() * (state.annual ? 0.8 : 1) * 100) / 100,
+    });
+    sync();
+    canvas.notify("Plan sent to the agent");
+    btn.textContent = "Sent ✓";
+    setTimeout(() => { btn.textContent = "Send to agent →"; btn.disabled = false; }, 1400);
+  };
+
+  canvas.on("state", (next) => {
+    if (!next || typeof next !== "object") return;
+    state = { ...DEFAULTS, ...next, addons: { ...DEFAULTS.addons, ...(next.addons || {}) } };
+    sync();
+  });
+
+  canvas.ready.then((saved) => {
+    if (saved && typeof saved === "object") {
+      state = { ...DEFAULTS, ...saved, addons: { ...DEFAULTS.addons, ...(saved.addons || {}) } };
+    }
+    sync();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="dark" />
+<title>Approval gate</title>
+<style>
+  :root {
+    --bg: #0e0e0f; --surface: #171718; --surface2: #1a1a1c; --border: #222224;
+    --fg: #c2c0b6; --bright: #d8d6cc; --dim: #8a8880; --faint: #6a6865;
+    --ok: #4CAF82; --err: #e05a5a; --warn: #d4a843; --accent: #8a82cc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px 16px 14px; background: var(--bg); color: var(--fg);
+    font: 13px/1.5 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .kicker { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--warn); }
+  h1 { font-size: 15px; margin: 4px 0 4px; color: var(--bright); font-weight: 600; }
+  .sub { margin: 0 0 12px; color: var(--faint); font-size: 11.5px; }
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 11.5px; margin: 0 0 14px; }
+  .meta dt { color: var(--faint); }
+  .meta dd { margin: 0; color: var(--dim); }
+  .btns { display: flex; gap: 8px; }
+  button {
+    flex: 1; border-radius: 7px; padding: 9px 10px; font: 600 12px/1 inherit; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+  }
+  button:hover { background: var(--surface2); }
+  button.approve { border-color: #1e3a28; background: #101a14; color: var(--ok); }
+  button.approve:hover { background: #16241b; }
+  button.reject { border-color: #3a1818; background: #1a1010; color: var(--err); }
+  button.reject:hover { background: #241616; }
+  .decision { display: none; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; font-size: 12px; }
+  .decision.show { display: flex; }
+  .decision .grow { flex: 1; }
+  .decision .when { color: var(--faint); font-size: 10.5px; }
+  .decision.yes { border-color: #1e3a28; }
+  .decision.no { border-color: #3a1818; }
+  .pill { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+  .pill.yes { color: var(--ok); background: #15241c; }
+  .pill.no { color: var(--err); background: #241515; }
+  .note { margin-top: 10px; font-size: 10.5px; color: var(--faint); }
+</style>
+</head>
+<body>
+  <div class="kicker">release gate</div>
+  <h1>Deploy 4.3.0 to production?</h1>
+  <p class="sub">Blocking until you decide. Your answer is recorded for the agent.</p>
+
+  <dl class="meta">
+    <dt>commit</dt><dd>9f2c41a · main</dd>
+    <dt>changes</dt><dd>14 files · 2 migrations</dd>
+    <dt>checks</dt><dd>tests ✓ · staging ✓ · rollback plan ✓</dd>
+  </dl>
+
+  <div class="btns" id="btns">
+    <button class="approve" id="approve">Approve &amp; deploy</button>
+    <button class="reject" id="reject">Reject</button>
+  </div>
+
+  <div class="decision" id="decision">
+    <span class="pill" id="pill"></span>
+    <span class="grow" id="decisionText"></span>
+    <span class="when" id="when"></span>
+    <button id="reset" style="flex:0 0 auto; padding:6px 9px; font-weight:500">Reset</button>
+  </div>
+
+  <p class="note" id="note">Waiting for a decision…</p>
+
+<script>
+  const DEFAULTS = { decision: null, at: null };
+  let state = { ...DEFAULTS };
+
+  const el = (id) => document.getElementById(id);
+
+  function sync() {
+    const decided = state.decision === "approve" || state.decision === "reject";
+    el("btns").style.display = decided ? "none" : "flex";
+    el("decision").className = "decision" + (decided ? " show" : "") + (state.decision === "approve" ? " yes" : state.decision === "reject" ? " no" : "");
+    if (decided) {
+      el("pill").textContent = state.decision === "approve" ? "approved" : "rejected";
+      el("pill").className = "pill " + (state.decision === "approve" ? "yes" : "no");
+      el("decisionText").textContent = state.decision === "approve" ? "Deploying 4.3.0" : "Release blocked";
+      el("when").textContent = state.at ? new Date(state.at).toLocaleTimeString() : "";
+      el("note").textContent = "Ask the agent what happens next — it reads this decision with get_ui_events.";
+    } else {
+      el("note").textContent = "Waiting for a decision…";
+    }
+    canvas.autosize();
+  }
+
+  async function decide(decision) {
+    state = { decision, at: Date.now() };
+    await canvas.state.set(state);
+    canvas.emit("release:decision", { decision, release: "4.3.0", commit: "9f2c41a" });
+    canvas.notify(decision === "approve" ? "Approved 4.3.0" : "Rejected 4.3.0");
+    sync();
+  }
+
+  el("approve").onclick = () => decide("approve");
+  el("reject").onclick = () => decide("reject");
+  el("reset").onclick = async () => {
+    state = { ...DEFAULTS };
+    await canvas.state.set(state);
+    canvas.emit("release:reset", { release: "4.3.0" });
+    sync();
+  };
+
+
+  canvas.on("state", (next) => {
+    if (!next || typeof next !== "object") return;
+    state = { ...DEFAULTS, ...next };
+    sync();
+  });
+
+  canvas.ready.then((saved) => {
+    if (saved && typeof saved === "object") state = { ...DEFAULTS, ...saved };
+    sync();
+  });
+</script>
+</body>
+</html>
