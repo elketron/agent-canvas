@@ -81,6 +81,18 @@ a timeline, triage checklist, notes, and status actions that emit events.
 | `screenshot` | capture a canvas or single item as a PNG image block (Playwright CDP open tab → headless fallback) |
 | `list_canvases` / `create_canvas` / `delete_node` | housekeeping |
 
+## Events to the agent, and serving behind a proxy
+
+When the user does something in a UI card (`canvas.emit`), the MCP server also sends
+`notifications/composer/event` with `{ session?, text, data: { canvasId, nodeId, type, payload, at } }`.
+A host that runs several sessions (composer) names the calling session in a tool call's
+`params._meta["composer/session"]`; the event names the session that last used that canvas, or no
+session (the host then picks its last caller). Hosts that don't know this notification ignore it,
+and `get_ui_events` keeps working either way.
+
+The web UI only uses relative URLs, so it also works under a path prefix, e.g. composer's
+`[apps.canvas] url = "http://127.0.0.1:4477"`, served at `/apps/canvas/`.
+
 ## Folder snapshots
 
 `save_canvases_to_folder` writes one `.canvas.json` per canvas (pass `canvas_ids`, or omit to save everything).

@@ -306,7 +306,7 @@ async function setMode(mode, persist = true) {
   }
   if (persist && state.canvasId) {
     try {
-      await api("PATCH", `/api/canvases/${encodeURIComponent(state.canvasId)}`, { mode });
+      await api("PATCH", `api/canvases/${encodeURIComponent(state.canvasId)}`, { mode });
     } catch {}
   }
 }
@@ -382,7 +382,7 @@ async function toggleLink(b) {
   try {
     const res = await api(
       on ? "POST" : "DELETE",
-      `/api/canvases/${encodeURIComponent(a)}/links${on ? "" : "/" + encodeURIComponent(b)}`,
+      `api/canvases/${encodeURIComponent(a)}/links${on ? "" : "/" + encodeURIComponent(b)}`,
       on ? { to: b } : undefined,
     );
     state.canvas.links = Array.isArray(res?.canvas?.links) ? res.canvas.links : [];
@@ -470,7 +470,7 @@ async function migrateLocalLinks() {
   if (!pairs.size) return;
   for (const pair of pairs) {
     const [a, b] = pair.split("\u0000");
-    try { await api("POST", `/api/canvases/${encodeURIComponent(a)}/links`, { to: b }); } catch {}
+    try { await api("POST", `api/canvases/${encodeURIComponent(a)}/links`, { to: b }); } catch {}
   }
   await loadList();
   renderRelated();
@@ -529,12 +529,12 @@ async function goNav(delta) {
 async function createSubgraphForNode(nodeId) {
   const n = nodeMap().get(nodeId);
   if (!n) return;
-  const sub = await api("POST", "/api/canvases", {
+  const sub = await api("POST", "api/canvases", {
     name: n.title,
     mode: "diagram",
     parentCanvasId: state.canvasId,
   });
-  await api("PATCH", `/api/nodes/${encodeURIComponent(nodeId)}`, { subCanvasId: sub.id });
+  await api("PATCH", `api/nodes/${encodeURIComponent(nodeId)}`, { subCanvasId: sub.id });
   await openSubCanvas(sub.id, nodeId);
 }
 
@@ -763,7 +763,7 @@ function fillBody(rec, n) {
     f.setAttribute("sandbox", "allow-scripts allow-forms allow-popups allow-modals");
     f.setAttribute("title", n.title);
     // The server composes the app page: node HTML + the canvas runtime it talks to.
-    f.src = `/api/nodes/${encodeURIComponent(n.id)}/app?v=${n.rev}`;
+    f.src = `api/nodes/${encodeURIComponent(n.id)}/app?v=${n.rev}`;
     rec.body.appendChild(f);
   } else if (n.type === "diagram") {
     renderMermaid(rec, n);
@@ -1021,7 +1021,7 @@ function renderInspector() {
 async function toggleCollapse(groupId) {
   const n = nodeMap().get(groupId);
   if (!n || n.type !== "group") return;
-  await api("PATCH", `/api/nodes/${encodeURIComponent(groupId)}`, { collapsed: !n.collapsed });
+  await api("PATCH", `api/nodes/${encodeURIComponent(groupId)}`, { collapsed: !n.collapsed });
 }
 
 function renderFlowBar() {
@@ -1062,7 +1062,7 @@ async function ensureNodeVisible(nodeId) {
   while (cur?.parentId) {
     const parent = byId.get(cur.parentId);
     if (parent?.type === "group" && parent.collapsed) {
-      await api("PATCH", `/api/nodes/${encodeURIComponent(parent.id)}`, { collapsed: false });
+      await api("PATCH", `api/nodes/${encodeURIComponent(parent.id)}`, { collapsed: false });
       parent.collapsed = false;
     }
     cur = parent;
@@ -1142,7 +1142,7 @@ function rootCanvasId(id, list = state.canvases) {
 }
 
 async function loadList() {
-  const list = await api("GET", "/api/canvases");
+  const list = await api("GET", "api/canvases");
   state.canvases = list;
   const sel = $("#canvasSel");
   const ids = new Set(list.map((c) => c.id));
@@ -1185,7 +1185,7 @@ async function loadCanvas(id, { focus, keepTrail = false, entering = false, from
   url.searchParams.set("canvas", id);
   url.hash = "";
   history.replaceState(null, "", url);
-  state.canvas = await api("GET", `/api/canvases/${encodeURIComponent(id)}`);
+  state.canvas = await api("GET", `api/canvases/${encodeURIComponent(id)}`);
   state.mode = parseMode(state.canvas.mode);
   if (state.mode === "ui") {
     state.dockLayout = dock.normalizeLayout(state.canvas.layout, state.canvas.nodes);
@@ -1223,7 +1223,7 @@ function scheduleRefresh() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(async () => {
     try {
-      state.canvas = await api("GET", `/api/canvases/${encodeURIComponent(state.canvasId)}`);
+      state.canvas = await api("GET", `api/canvases/${encodeURIComponent(state.canvasId)}`);
       const nextMode = parseMode(state.canvas.mode);
       if (nextMode !== state.mode) {
         state.mode = nextMode;
@@ -1267,12 +1267,12 @@ window.addEventListener("message", async (e) => {
       case "state.get":
         return reply(true, rec.node.state ?? null);
       case "state.set": {
-        const saved = await api("PUT", `/api/nodes/${encodeURIComponent(nodeId)}/state`, { state: params.state ?? null });
+        const saved = await api("PUT", `api/nodes/${encodeURIComponent(nodeId)}/state`, { state: params.state ?? null });
         rec.node.state = saved.state;
         return reply(true, saved.state);
       }
       case "emit": {
-        const ev = await api("POST", `/api/nodes/${encodeURIComponent(nodeId)}/events`, { type: params.type, payload: params.payload });
+        const ev = await api("POST", `api/nodes/${encodeURIComponent(nodeId)}/events`, { type: params.type, payload: params.payload });
         return reply(true, ev);
       }
       case "notify":
@@ -1294,14 +1294,14 @@ window.addEventListener("message", async (e) => {
         drawEdges(active, hotEdges);
         clearTimeout(resizeTimers.get(nodeId));
         resizeTimers.set(nodeId, setTimeout(() => {
-          api("PATCH", `/api/nodes/${nodeId}`, { h: n.h, w: n.w }).catch(() => {});
+          api("PATCH", `api/nodes/${nodeId}`, { h: n.h, w: n.w }).catch(() => {});
         }, 200));
         return reply(true, true);
       }
       case "setTitle": {
         const title = String(params.title ?? "").trim();
         if (!title) return reply(false, "title required");
-        await api("PATCH", `/api/nodes/${nodeId}`, { title });
+        await api("PATCH", `api/nodes/${nodeId}`, { title });
         rec.node.title = title;
         rec.el.querySelector(".title").textContent = title;
         if (state.mode === "ui") renderDock();
@@ -1347,7 +1347,7 @@ function toast(text, action) {
 // ---- live updates --------------------------------------------------------------
 let serverBootId = null;
 function connectEvents() {
-  const es = new EventSource("/api/events");
+  const es = new EventSource("api/events");
   const status = $("#status");
   let wasDown = false;
   es.onopen = () => {
@@ -1398,7 +1398,7 @@ const editor = $("#editor");
 let editing = null;
 
 async function openEditor(id) {
-  const n = await api("GET", `/api/nodes/${id}`);
+  const n = await api("GET", `api/nodes/${id}`);
   editing = n;
   editor.dataset.type = n.type;
   $("#edType").textContent = n.type;
@@ -1441,7 +1441,7 @@ $("#edSave").onclick = async () => {
       patch.subCanvasId = $("#edSubCanvas").value;
       patch.color = $("#edColor").value;
     }
-    await api("PATCH", `/api/nodes/${editing.id}`, patch);
+    await api("PATCH", `api/nodes/${editing.id}`, patch);
     editor.close();
   } catch (e) { toast(`Save failed: ${e.message}`); }
 };
@@ -1462,7 +1462,7 @@ function persistDockLayout() {
   if (state.canvas) state.canvas.layout = payload;
   clearTimeout(persistDockTimer);
   persistDockTimer = setTimeout(() => {
-    api("PATCH", `/api/canvases/${encodeURIComponent(state.canvasId)}`, { layout: payload }).catch(() => {});
+    api("PATCH", `api/canvases/${encodeURIComponent(state.canvasId)}`, { layout: payload }).catch(() => {});
   }, 120);
 }
 
@@ -1790,7 +1790,7 @@ dockLayer.addEventListener("click", async (e) => {
   const paneId = btn.dataset.pane;
   const n = nodeId ? nodeMap().get(nodeId) : null;
   if (act === "edit" && nodeId) openEditor(nodeId);
-  else if (act === "open" && nodeId) open(`/api/nodes/${nodeId}/${n?.type === "html" ? "app" : "render"}`, "_blank");
+  else if (act === "open" && nodeId) open(`api/nodes/${nodeId}/${n?.type === "html" ? "app" : "render"}`, "_blank");
   else if (act === "minimize" && nodeId) {
     if (state.dockMaximized === paneId) state.dockMaximized = null;
     state.dockLayout = dock.minimizeNode(state.dockLayout, nodeId);
@@ -1801,7 +1801,7 @@ dockLayer.addEventListener("click", async (e) => {
     renderDock();
   } else if (act === "del" && nodeId && confirm(`Delete “${n?.title}”?`)) {
     if (state.dockMaximized === paneId) state.dockMaximized = null;
-    await api("DELETE", `/api/nodes/${nodeId}`);
+    await api("DELETE", `api/nodes/${nodeId}`);
   }
 });
 
@@ -1936,7 +1936,7 @@ async function addItem(kind, at) {
   const tpl = TEMPLATES[kind];
   const nodeType = tpl.type || kind;
   const p = state.mode === "ui" ? { x: 0, y: 0 } : (at ?? toWorld(innerWidth / 2 - 150, innerHeight / 2 - 100));
-  const n = await api("POST", `/api/canvases/${encodeURIComponent(state.canvasId)}/nodes`, {
+  const n = await api("POST", `api/canvases/${encodeURIComponent(state.canvasId)}/nodes`, {
     ...tpl, type: nodeType, x: p.x, y: p.y, author: "user",
   });
   if (state.mode === "ui") state.selected = n.id;
@@ -1957,7 +1957,7 @@ viewport.addEventListener("pointerdown", async (e) => {
     if (!edge) return;
     if (state.linking) {
       if (confirm(`Remove arrow ${edge.label ? `“${edge.label}”` : edge.id}?`)) {
-        await api("DELETE", `/api/edges/${encodeURIComponent(eid)}`);
+        await api("DELETE", `api/edges/${encodeURIComponent(eid)}`);
       }
       return;
     }
@@ -1981,7 +1981,7 @@ viewport.addEventListener("pointerdown", async (e) => {
         applyGraphHighlight();
       } else {
         const label = prompt("Arrow label (optional):", "") ?? "";
-        await api("POST", `/api/canvases/_/edges`, { from: state.linkFrom, to: id, label: label.trim() || undefined });
+        await api("POST", `api/canvases/_/edges`, { from: state.linkFrom, to: id, label: label.trim() || undefined });
         state.linkFrom = null;
         applyGraphHighlight();
       }
@@ -2068,9 +2068,9 @@ async function endPointer() {
         const moves = [{ id: d.id, x: d.geom.x, y: d.geom.y }];
         const rdx = d.geom.x - d.start.x, rdy = d.geom.y - d.start.y;
         for (const ch of d.childStarts) moves.push({ id: ch.id, x: ch.x + rdx, y: ch.y + rdy });
-        await api("PATCH", `/api/canvases/${encodeURIComponent(state.canvasId)}/positions`, { moves });
+        await api("PATCH", `api/canvases/${encodeURIComponent(state.canvasId)}/positions`, { moves });
       } else {
-        await api("PATCH", `/api/nodes/${d.id}`, d.geom);
+        await api("PATCH", `api/nodes/${d.id}`, d.geom);
       }
     } catch (err) { toast(`Move failed: ${err.message}`); }
   }
@@ -2092,8 +2092,8 @@ viewport.addEventListener("click", async (e) => {
   if (b.dataset.act === "inspect") select(id);
   if (b.dataset.act === "collapse") toggleCollapse(id);
   if (b.dataset.act === "edit") openEditor(id);
-  if (b.dataset.act === "open") open(`/api/nodes/${id}/${n?.type === "html" ? "app" : "render"}`, "_blank");
-  if (b.dataset.act === "del" && confirm(`Delete “${n?.title}”?`)) await api("DELETE", `/api/nodes/${id}`);
+  if (b.dataset.act === "open") open(`api/nodes/${id}/${n?.type === "html" ? "app" : "render"}`, "_blank");
+  if (b.dataset.act === "del" && confirm(`Delete “${n?.title}”?`)) await api("DELETE", `api/nodes/${id}`);
 });
 
 viewport.addEventListener("dblclick", (e) => {
@@ -2156,12 +2156,12 @@ $("#navFwd").onclick = () => goNav(1);
 $("#newCanvas").onclick = async () => {
   const name = prompt("Canvas name");
   if (!name) return;
-  const c = await api("POST", "/api/canvases", { name, mode: state.mode });
+  const c = await api("POST", "api/canvases", { name, mode: state.mode });
   loadCanvas(c.id);
 };
 $("#delCanvas").onclick = async () => {
   if (!confirm(`Delete canvas “${state.canvas?.name}” and everything on it?`)) return;
-  await api("DELETE", `/api/canvases/${encodeURIComponent(state.canvasId)}`);
+  await api("DELETE", `api/canvases/${encodeURIComponent(state.canvasId)}`);
   loadCanvas("main");
 };
 
@@ -2170,7 +2170,7 @@ $("#flowNext").onclick = () => stepFlow(1);
 $("#insClose").onclick = () => select(null);
 $("#insFocus").onclick = () => state.selected && panToNode(state.selected, { zoom: 1.05 });
 $("#insEdit").onclick = () => state.selected && openEditor(state.selected);
-$("#insOpen").onclick = () => state.selected && open(`/api/nodes/${state.selected}/render`, "_blank");
+$("#insOpen").onclick = () => state.selected && open(`api/nodes/${state.selected}/render`, "_blank");
 
 addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select, dialog")) return;

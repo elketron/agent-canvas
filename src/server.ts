@@ -153,7 +153,7 @@ function renderStandalone(node: store.CanvasNode, canvasId: string): Response {
     html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(node.title)}</title>${FONT_LINK}</head>
 <body style="margin:0;background:#0e0e0f;min-height:100vh;display:grid;place-items:center">
 <pre class="mermaid">${esc(node.content)}</pre>
-<script type="module">import m from "${MERMAID_ESM}";import { MERMAID_THEME } from "/mermaid-theme.js";m.initialize({startOnLoad:false,theme:"base",securityLevel:"strict",fontFamily:MERMAID_THEME.fontFamily,themeVariables:MERMAID_THEME});await m.run({querySelector:".mermaid"});</script>
+<script type="module">import m from "${MERMAID_ESM}";import { MERMAID_THEME } from "../../../mermaid-theme.js";m.initialize({startOnLoad:false,theme:"base",securityLevel:"strict",fontFamily:MERMAID_THEME.fontFamily,themeVariables:MERMAID_THEME});await m.run({querySelector:".mermaid"});</script>
 </body></html>`;
   } else if (node.type === "card" || node.type === "group") {
     html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(node.title)}</title>${FONT_LINK}</head>

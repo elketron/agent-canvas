@@ -613,7 +613,7 @@ const tools: Tool[] = [
 
 const INSTRUCTIONS = `Agent Canvas: a shared canvas the user watches live in the browser (${BASE}) with three modes: board, diagram, and ui.
 Use it whenever a picture or live control beats prose:
-- Interactive UIs (dockable workspace): create_canvas with mode="ui" for a non-infinite workspace where boards dock into resizable splits and tabs. Use create_ui to build real app boards whose JS runs live and talks back — persistent state via canvas.state, and user actions via canvas.emit, which you read with get_ui_events. Push data into a running UI with set_ui_state. Best for controls the human will actually use: settings panels, calculators, filters, approval gates, dashboards, small tools. Read get_ui_events when the user says they "tried it" / "picked one" / "filled it in".
+- Interactive UIs (dockable workspace): create_canvas with mode="ui" for a non-infinite workspace where boards dock into resizable splits and tabs. Use create_ui to build real app boards whose JS runs live and talks back — persistent state via canvas.state, and user actions via canvas.emit, which you read with get_ui_events. Push data into a running UI with set_ui_state. Best for controls the human will actually use: settings panels, calculators, filters, approval gates, dashboards, small tools. Read get_ui_events when the user says they "tried it" / "picked one" / "filled it in". Under a host that understands notifications/composer/event (composer), what the user does in a UI card also reaches you unasked, as a notice.
 - Interactive click-through diagrams (repo maps, system architectures): create_canvas with mode="diagram", add connected nodes via create_card + connect, wrap related nodes into collapsible subgraphs with create_group(children=[...]), link deeper drill-down canvases via sub_canvas_id, and optionally attach guided walkthroughs via set_canvas_mode(flows).
 - UI mockups & workflows: mode="board" (infinite canvas) with create_html_board (rendered live in sandboxed iframes), create_diagram (Mermaid), and create_note (annotations).
 - Peer canvases: link_canvases relates two canvases laterally (shown in the ⧉ dock in the UI), while sub_canvas_id is for parent/child drill-down.
@@ -625,12 +625,82 @@ Prefer one canvas per project/topic (create_canvas), and tell the user the view 
 // ---- JSON-RPC over stdio ------------------------------------------------------
 const send = (msg: object) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n");
 
+// ---- telling the agent what the user did ---------------------------------------
+// A host that runs several sessions (composer) names the calling session in
+// `params._meta["composer/session"]`. We remember which session last touched each canvas, and when
+// the user acts inside a UI card we send `notifications/composer/event` naming that session (or no
+// session: the host then picks the last caller). Hosts that don't know the notification ignore it.
+const SESSION_META = "composer/session";
+const canvasSession = new Map<string, string>();
+let lastSession: string | undefined;
+
+function noteCaller(params: any) {
+  const session = params?._meta?.[SESSION_META];
+  if (typeof session !== "string") return;
+  lastSession = session;
+  const args = params?.arguments ?? {};
+  for (const key of ["canvas_id", "canvas", "canvasId"]) {
+    if (typeof args[key] === "string") canvasSession.set(args[key], session);
+  }
+}
+
+async function nodeTitle(nodeId: string): Promise<string | undefined> {
+  try { return (await api("GET", `/api/nodes/${encodeURIComponent(nodeId)}`)).title; } catch { return undefined; }
+}
+
+async function forwardUiEvent(ev: { canvasId: string; nodeId: string; event: { type: string; payload: unknown; at: string } }) {
+  if (!lastSession) return; // no host session has used the canvas yet: nobody to tell
+  const title = await nodeTitle(ev.nodeId);
+  const session = canvasSession.get(ev.canvasId);
+  send({
+    method: "notifications/composer/event",
+    params: {
+      ...(session ? { session } : {}),
+      text: `the user did "${ev.event.type}" in ${title ? `"${title}"` : `node ${ev.nodeId}`} (canvas ${ev.canvasId}, node ${ev.nodeId})`,
+      data: { canvasId: ev.canvasId, nodeId: ev.nodeId, type: ev.event.type, payload: ev.event.payload, at: ev.event.at },
+    },
+  });
+}
+
+// Follows the canvas server's event stream for as long as this process lives, reconnecting when it drops.
+let following = false;
+async function followEvents() {
+  if (following) return;
+  following = true;
+  for (;;) {
+    try {
+      await ensureServer();
+      const res = await fetch(`${BASE}/api/events`);
+      if (!res.ok || !res.body) throw new Error(`events: ${res.status}`);
+      const decoder = new TextDecoder();
+      let buf = "";
+      for await (const chunk of res.body) {
+        buf += decoder.decode(chunk, { stream: true });
+        let cut;
+        while ((cut = buf.indexOf("\n\n")) >= 0) {
+          const frame = buf.slice(0, cut);
+          buf = buf.slice(cut + 2);
+          const data = frame.split("\n").filter((l) => l.startsWith("data: ")).map((l) => l.slice(6)).join("\n");
+          if (!data) continue;
+          let ev: any;
+          try { ev = JSON.parse(data); } catch { continue; }
+          if (ev.kind === "ui-event") forwardUiEvent(ev).catch((e) => log("event:", e.message));
+        }
+      }
+    } catch (e: any) {
+      log("event stream:", e.message);
+    }
+    await Bun.sleep(1000);
+  }
+}
+
 async function handle(msg: any) {
   const { id, method, params } = msg;
   if (id === undefined) return; // notification
   switch (method) {
     case "initialize":
       ensureServer().catch((e) => log(e.message));
+      followEvents();
       return send({
         id,
         result: {
@@ -645,6 +715,7 @@ async function handle(msg: any) {
     case "tools/list":
       return send({ id, result: { tools: tools.map(({ run, ...t }) => t) } });
     case "tools/call": {
+      noteCaller(params);
       const tool = tools.find((t) => t.name === params?.name);
       if (!tool) return send({ id, error: { code: -32602, message: `unknown tool ${params?.name}` } });
       try {

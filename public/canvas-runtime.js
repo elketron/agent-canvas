@@ -23,6 +23,9 @@
   const host = window.__canvasHost || {};
   const node = { id: host.nodeId, canvasId: host.canvasId, title: host.title };
   const standalone = window.parent === window;
+  // Where the canvas server's root is: this page is <root>/api/nodes/<id>/app, and <root> may be a
+  // path prefix when a proxy serves the canvas (e.g. composer at /apps/canvas/).
+  const root = location.pathname.replace(/\/api\/nodes\/[^/]*\/[^/]*$/, "");
   const listeners = new Map();
   const pending = new Map();
   let seq = 0;
@@ -67,7 +70,7 @@
 
   // ---- transport ------------------------------------------------------------
   async function direct(method, params) {
-    const base = `/api/nodes/${encodeURIComponent(node.id)}`;
+    const base = `${root}/api/nodes/${encodeURIComponent(node.id)}`;
     if (method === "state.get") {
       const r = await fetch(`${base}/state`);
       const j = await r.json();
@@ -96,11 +99,11 @@
       let canvasId = params.canvasId;
       if (params.nodeId && !canvasId) {
         try {
-          const info = await (await fetch(`/api/nodes/${encodeURIComponent(params.nodeId)}`)).json();
+          const info = await (await fetch(`${root}/api/nodes/${encodeURIComponent(params.nodeId)}`)).json();
           canvasId = info.canvasId;
         } catch {}
       }
-      location.href = `/?canvas=${encodeURIComponent(canvasId || "main")}#node=${encodeURIComponent(params.nodeId || "")}`;
+      location.href = `${root}/?canvas=${encodeURIComponent(canvasId || "main")}#node=${encodeURIComponent(params.nodeId || "")}`;
       return true;
     }
     return false; // resize / focus / setTitle / notify have no meaning standalone
